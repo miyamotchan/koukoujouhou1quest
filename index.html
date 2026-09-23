@@ -470,34 +470,24 @@
         window.onload = () => {
             showScreen('loading');
             
-            if (GAS_API_URL !== "https://script.google.com/macros/s/AKfycbxhpAbX_14rvdOiSGH4z4s6opqIucTH6NvUnm5PUEMThG7iMrtzpfFr9QcvKkEr0aL_sQ/exec") {
-                // GitHub Pages 等の外部環境からGASのAPIを叩く処理
-                fetch(GAS_API_URL)
-                    .then(response => {
-                        if (!response.ok) throw new Error("ネットワークエラー");
-                        return response.json();
-                    })
-                    .then(data => {
-                        if (data.error) throw new Error(data.error);
-                        if (!data || data.length === 0) {
-                            throw new Error("スプレッドシートに問題が見つかりません。");
-                        }
-                        loadData(data);
-                        showScreen('home');
-                    })
-                    .catch(error => {
-                        const txt = document.getElementById('loading-text');
-                        txt.textContent = '通信エラー: ' + error.message;
-                        txt.classList.replace('text-slate-500', 'text-rose-500');
-                    });
-            } else {
-                // URLが設定されていない場合はプレビュー用のサンプルデータを表示
-                console.log("プレビュー環境のため、サンプルデータをロードします。");
-                setTimeout(() => {
-                    loadData(defaultQuestions);
+            fetch(GAS_API_URL)
+                .then(response => {
+                    if (!response.ok) throw new Error("ネットワークエラー");
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) throw new Error(data.error);
+                    if (!data || data.length === 0) {
+                        throw new Error("スプレッドシートに問題が見つかりません。");
+                    }
+                    loadData(data);
                     showScreen('home');
-                }, 1200);
-            }
+                })
+                .catch(error => {
+                    const txt = document.getElementById('loading-text');
+                    txt.textContent = '通信エラー: ' + error.message;
+                    txt.classList.replace('text-slate-500', 'text-rose-500');
+                });
         };
     </script>
 </body>
