@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>情報Ⅰ クエスト - 楽しく学ぶ小テスト</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background-color: #f0fdfa;
+            background-image: radial-gradient(#ccfbf1 2px, transparent 2px);
+            background-size: 30px 30px;
+        }
+
+        @keyframes bounce-in {
+            0% { transform: scale(0.8); opacity: 0; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-10px); }
+            40%, 80% { transform: translateX(10px); }
+        }
+
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        .animate-bounce-in { animation: bounce-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .animate-shake { animation: shake 0.4s ease-in-out; }
+        .animate-pop { animation: pop 0.3s ease-in-out; }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #5eead4; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #14b8a6; }
+
+        .btn-push {
+            transition: all 0.1s;
+            box-shadow: 0 4px 0 0 rgba(0,0,0,0.2);
+        }
+        .btn-push:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 0 rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 text-slate-800">
+
+    <div id="app-container" class="w-full max-w-md bg-white rounded-[2rem] shadow-2xl overflow-hidden relative border-4 border-teal-100">
+        
+        <!-- 0. ローディング画面 -->
+        <div id="screen-loading" class="flex p-8 flex-col items-center justify-center h-[600px] text-center bg-teal-50">
+            <div class="text-6xl animate-bounce mb-6 drop-shadow-md">📡</div>
+            <h2 class="text-2xl font-black text-teal-600 mb-2">データベース接続中</h2>
+            <p id="loading-text" class="text-slate-500 font-bold text-sm leading-relaxed mt-2">スプレッドシートから<br>最新の問題を読み込んでいます...</p>
+        </div>
+        
+        <!-- 1. ホーム画面 -->
+        <div id="screen-home" class="hidden p-6 md:p-8 flex-col h-[600px]">
+            <div class="text-center mb-8 mt-4 animate-bounce-in">
+                <div class="bg-teal-500 text-white text-xs font-bold px-3 py-1 rounded-full inline-block mb-2">高校情報科</div>
+                <h1 class="text-4xl font-black text-teal-600 drop-shadow-sm">情報Ⅰクエスト</h1>
+                <p class="text-slate-500 mt-2 text-sm font-bold">~ データベース駆動型 小テスト ~</p>
+            </div>
+
+            <div class="flex-grow flex flex-col justify-center space-y-6">
+                <!-- 章選択 -->
+                <div class="space-y-2">
+                    <label class="block text-sm font-bold text-teal-700">冒険する「章」を選択</label>
+                    <select id="select-chapter" class="w-full p-4 rounded-xl border-2 border-teal-200 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 outline-none text-lg font-bold bg-teal-50/50 appearance-none cursor-pointer transition-all">
+                        <!-- JSで動的に追加 -->
+                    </select>
+                </div>
+
+                <!-- 項目選択 -->
+                <div class="space-y-2">
+                    <label class="block text-sm font-bold text-teal-700">絞り込む「項目」を選択</label>
+                    <select id="select-item" class="w-full p-4 rounded-xl border-2 border-teal-200 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 outline-none text-lg font-bold bg-teal-50/50 appearance-none cursor-pointer transition-all">
+                        <option value="ALL">すべて（章全体）</option>
+                        <!-- JSで動的に追加 -->
+                    </select>
+                </div>
+
+                <div class="pt-4">
+                    <button id="btn-start" class="w-full bg-gradient-to-r from-orange-400 to-rose-400 text-white text-xl font-black py-4 rounded-2xl btn-push hover:from-orange-500 hover:to-rose-500">
+                        ▶ クエストを開始する！
+                    </button>
+                </div>
+            </div>
+
+            <div class="mt-auto pt-6 border-t border-slate-100 flex justify-between items-center text-sm">
+                <span class="text-slate-400 font-bold">全 <span id="total-questions-count">0</span> 問ロード済</span>
+                <div class="text-teal-500 font-bold flex items-center">
+                    📊 Spreadsheet DB
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. クイズ画面 -->
+        <div id="screen-quiz" class="hidden p-6 h-[600px] flex-col relative bg-slate-50">
+            <!-- ヘッダー (プログレス＆コンボ) -->
+            <div class="flex justify-between items-center mb-4">
+                <div class="w-2/3 bg-slate-200 rounded-full h-4 overflow-hidden">
+                    <div id="progress-bar" class="bg-teal-500 h-full rounded-full transition-all duration-300 w-0"></div>
+                </div>
+                <div class="text-right text-sm font-bold text-slate-500 ml-2">
+                    <span id="current-q-num">1</span> / <span id="total-q-num">10</span>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-end mb-4">
+                <div class="bg-white px-3 py-1 rounded-lg border-2 border-slate-200 text-sm font-bold text-slate-500 shadow-sm inline-block">
+                    SCORE: <span id="score-display" class="text-teal-600 text-lg">0</span>
+                </div>
+                <div id="combo-display" class="text-rose-500 font-black text-xl italic opacity-0 transition-opacity transform origin-bottom-right">
+                    2 COMBO! 🔥
+                </div>
+            </div>
+
+            <!-- 問題エリア -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border-2 border-slate-100 flex-grow flex flex-col">
+                <div class="text-xs font-bold text-teal-500 mb-2" id="q-category">章 > 項目</div>
+                <h2 id="q-text" class="text-xl font-bold leading-relaxed mb-6 flex-grow">
+                    問題文がここに入ります。
+                </h2>
+                
+                <!-- 選択肢 -->
+                <div id="choices-container" class="space-y-3">
+                    <!-- JSで動的にボタンを追加 -->
+                </div>
+            </div>
+
+            <!-- 正解・不正解オーバーレイ -->
+            <div id="feedback-overlay" class="absolute inset-0 flex items-center justify-center z-10 hidden bg-white/80 backdrop-blur-sm">
+                <div id="feedback-content" class="text-center p-8 rounded-3xl bg-white shadow-2xl border-4 transform transition-transform">
+                    <div id="feedback-icon" class="text-8xl mb-4">⭕</div>
+                    <div id="feedback-title" class="text-3xl font-black mb-4">正解！</div>
+                    <button id="btn-next" class="mt-6 w-full bg-teal-500 text-white font-bold py-3 rounded-xl btn-push hidden">
+                        次へ進む ▶
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 結果画面 -->
+        <div id="screen-result" class="hidden p-8 flex-col items-center justify-center h-[600px] text-center bg-teal-50">
+            <h2 class="text-3xl font-black text-teal-600 mb-2">クエスト完了！</h2>
+            
+            <div class="my-8 relative w-48 h-48 flex items-center justify-center bg-white rounded-full shadow-lg border-8 border-teal-200">
+                <div class="absolute text-5xl">👑</div>
+                <div class="z-10 mt-12 flex flex-col items-center">
+                    <span class="text-sm font-bold text-slate-400">正答率</span>
+                    <span id="result-percent" class="text-5xl font-black text-slate-700">100<span class="text-2xl">%</span></span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 w-full mb-8">
+                <div class="bg-white p-4 rounded-xl shadow-sm">
+                    <div class="text-sm font-bold text-slate-400">最終スコア</div>
+                    <div id="result-score" class="text-2xl font-black text-orange-500">1250</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm">
+                    <div class="text-sm font-bold text-slate-400">最大コンボ</div>
+                    <div id="result-max-combo" class="text-2xl font-black text-rose-500">5</div>
+                </div>
+            </div>
+
+            <button id="btn-return-home" class="w-full bg-teal-600 text-white text-xl font-black py-4 rounded-2xl btn-push hover:bg-teal-700">
+                🏠 ホームに戻る
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // サンプル問題（GAS通信ができないプレビュー環境用）
+        const defaultQuestions = [
+            { chapter: "第1章 情報社会", item: "情報モラル", q: "著作権が自動的に発生する原則を何というか？", c1: "方式主義", c2: "無方式主義", c3: "申請主義", c4: "登録主義", ans: "無方式主義" },
+            { chapter: "第1章 情報社会", item: "情報モラル", q: "個人情報を保護するための日本の法律はどれか？", c1: "不正アクセス禁止法", c2: "プロバイダ責任制限法", c3: "個人情報保護法", c4: "著作権法", ans: "個人情報保護法" },
+            { chapter: "第2章 コミュニケーション", item: "情報デザイン", q: "誰でも使いやすいように設計されたデザインを何と呼ぶか？", c1: "ユニバーサルデザイン", c2: "エコデザイン", c3: "バリアフリーデザイン", c4: "インクルーシブデザイン", ans: "ユニバーサルデザイン" },
+            { chapter: "第2章 コミュニケーション", item: "メディア", q: "情報が一方通行で送られるメディアの代表例は？", c1: "SNS", c2: "テレビ放送", c3: "ビデオ会議", c4: "オンラインチャット", ans: "テレビ放送" },
+            { chapter: "第3章 コンピュータ", item: "ハードウェア", q: "コンピュータの五大装置のうち、計算を行う装置は？", c1: "記憶装置", c2: "入力装置", c3: "演算装置", c4: "制御装置", ans: "演算装置" },
+            { chapter: "第4章 ネットワーク", item: "仕組み", q: "インターネット上でコンピュータを識別するための番号は？", c1: "MACアドレス", c2: "IPアドレス", c3: "URL", c4: "プロトコル", ans: "IPアドレス" }
+        ];
+
+        let appState = {
+            allQuestions: [],
+            currentQuestions: [],
+            currentIndex: 0,
+            score: 0,
+            combo: 0,
+            maxCombo: 0,
+            correctCount: 0,
+            isAudioInitialized: false,
+            audio: { synth: null }
+        };
+
+        const DOM = {
+            screens: {
+                loading: document.getElementById('screen-loading'),
+                home: document.getElementById('screen-home'),
+                quiz: document.getElementById('screen-quiz'),
+                result: document.getElementById('screen-result')
+            },
+            home: {
+                selectChapter: document.getElementById('select-chapter'),
+                selectItem: document.getElementById('select-item'),
+                btnStart: document.getElementById('btn-start'),
+                totalCount: document.getElementById('total-questions-count')
+            },
+            quiz: {
+                progressBar: document.getElementById('progress-bar'),
+                currentNum: document.getElementById('current-q-num'),
+                totalNum: document.getElementById('total-q-num'),
+                score: document.getElementById('score-display'),
+                combo: document.getElementById('combo-display'),
+                category: document.getElementById('q-category'),
+                text: document.getElementById('q-text'),
+                choicesContainer: document.getElementById('choices-container'),
+                feedbackOverlay: document.getElementById('feedback-overlay'),
+                feedbackContent: document.getElementById('feedback-content'),
+                feedbackIcon: document.getElementById('feedback-icon'),
+                feedbackTitle: document.getElementById('feedback-title'),
+                btnNext: document.getElementById('btn-next')
+            },
+            result: {
+                percent: document.getElementById('result-percent'),
+                score: document.getElementById('result-score'),
+                maxCombo: document.getElementById('result-max-combo'),
+                btnHome: document.getElementById('btn-return-home')
+            }
+        };
+
+        function initAudio() {
+            if (!appState.isAudioInitialized) {
+                appState.audio.synth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: "triangle" },
+                    envelope: { attack: 0.05, decay: 0.1, sustain: 0.3, release: 1 }
+                }).toDestination();
+                appState.audio.synth.volume.value = -10;
+                Tone.start();
+                appState.isAudioInitialized = true;
+            }
+        }
+
+        function playSound(type) {
+            if (!appState.isAudioInitialized) return;
+            const now = Tone.now();
+            if (type === 'correct') {
+                appState.audio.synth.triggerAttackRelease(["C5", "E5", "G5"], "8n", now);
+            } else if (type === 'wrong') {
+                appState.audio.synth.triggerAttackRelease(["F3", "A3"], "8n", now);
+            } else if (type === 'finish') {
+                appState.audio.synth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "2n", now);
+            }
+        }
+
+        function showScreen(screenName) {
+            Object.values(DOM.screens).forEach(s => {
+                s.classList.add('hidden');
+                s.classList.remove('flex');
+            });
+            DOM.screens[screenName].classList.remove('hidden');
+            DOM.screens[screenName].classList.add('flex');
+        }
+
+        function loadData(dataArray) {
+            appState.allQuestions = dataArray;
+            updateHomeDropdowns();
+            DOM.home.totalCount.textContent = dataArray.length;
+        }
+
+        function updateHomeDropdowns() {
+            const chapters = [...new Set(appState.allQuestions.map(q => q.chapter))].filter(Boolean);
+            
+            DOM.home.selectChapter.innerHTML = '';
+            chapters.forEach(chap => {
+                const opt = document.createElement('option');
+                opt.value = chap;
+                opt.textContent = chap;
+                DOM.home.selectChapter.appendChild(opt);
+            });
+
+            if (chapters.length > 0) {
+                updateItemDropdown(chapters[0]);
+            }
+        }
+
+        function updateItemDropdown(selectedChapter) {
+            const items = [...new Set(
+                appState.allQuestions
+                    .filter(q => q.chapter === selectedChapter)
+                    .map(q => q.item)
+            )].filter(Boolean);
+
+            DOM.home.selectItem.innerHTML = '<option value="ALL">すべて（章全体）</option>';
+            items.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item;
+                opt.textContent = item;
+                DOM.home.selectItem.appendChild(opt);
+            });
+        }
+
+        DOM.home.selectChapter.addEventListener('change', (e) => {
+            updateItemDropdown(e.target.value);
+        });
+
+        function startQuiz() {
+            initAudio();
+
+            const chap = DOM.home.selectChapter.value;
+            const item = DOM.home.selectItem.value;
+
+            appState.currentQuestions = appState.allQuestions.filter(q => {
+                if (item === 'ALL') return q.chapter === chap;
+                return q.chapter === chap && q.item === item;
+            });
+
+            // ランダムシャッフル
+            for (let i = appState.currentQuestions.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [appState.currentQuestions[i], appState.currentQuestions[j]] = [appState.currentQuestions[j], appState.currentQuestions[i]];
+            }
+
+            if (appState.currentQuestions.length === 0) return;
+
+            appState.currentIndex = 0;
+            appState.score = 0;
+            appState.combo = 0;
+            appState.maxCombo = 0;
+            appState.correctCount = 0;
+            DOM.quiz.totalNum.textContent = appState.currentQuestions.length;
+            updateScoreUI();
+
+            showScreen('quiz');
+            renderQuestion();
+        }
+
+        function renderQuestion() {
+            const q = appState.currentQuestions[appState.currentIndex];
+            const progress = (appState.currentIndex / appState.currentQuestions.length) * 100;
+            DOM.quiz.progressBar.style.width = `${progress}%`;
+            DOM.quiz.currentNum.textContent = appState.currentIndex + 1;
+            
+            DOM.quiz.category.textContent = `${q.chapter} > ${q.item}`;
+            DOM.quiz.text.textContent = q.q;
+
+            DOM.quiz.choicesContainer.innerHTML = '';
+            
+            // 選択肢を取得し、空のものを除外
+            let choices = [q.c1, q.c2, q.c3, q.c4].filter(Boolean);
+            
+            // 選択肢をランダムにシャッフル (Fisher-Yates)
+            for (let i = choices.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [choices[i], choices[j]] = [choices[j], choices[i]];
+            }
+            
+            choices.forEach((choiceText, index) => {
+                const choiceNum = index + 1;
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-4 rounded-xl border-2 border-slate-200 hover:border-teal-400 hover:bg-teal-50 transition-colors font-bold text-slate-700 relative overflow-hidden group";
+                btn.innerHTML = `
+                    <span class="inline-block w-8 h-8 bg-slate-100 text-slate-500 rounded-lg text-center leading-8 mr-3 group-hover:bg-teal-100 group-hover:text-teal-600 transition-colors">${choiceNum}</span>
+                    ${choiceText}
+                `;
+                // クリック時に選んだ「テキスト」と正解の「テキスト」を渡す
+                btn.onclick = () => handleAnswer(choiceText, q.ans);
+                DOM.quiz.choicesContainer.appendChild(btn);
+            });
+
+            DOM.quiz.text.classList.remove('animate-bounce-in');
+            void DOM.quiz.text.offsetWidth;
+            DOM.quiz.text.classList.add('animate-bounce-in');
+        }
+
+        function handleAnswer(selectedText, correctText) {
+            // 文字列が一致するかどうかで正誤判定
+            const isCorrect = selectedText === correctText;
+            
+            DOM.quiz.feedbackOverlay.classList.remove('hidden');
+            DOM.quiz.feedbackContent.className = 'text-center p-8 rounded-3xl shadow-2xl border-4 transform transition-transform animate-bounce-in max-w-sm w-full mx-4';
+            DOM.quiz.btnNext.classList.remove('hidden');
+
+            if (isCorrect) {
+                playSound('correct');
+                DOM.quiz.feedbackContent.classList.add('bg-white', 'border-teal-400');
+                DOM.quiz.feedbackIcon.textContent = '⭕';
+                DOM.quiz.feedbackIcon.className = 'text-7xl mb-4 text-teal-500 animate-pop';
+                DOM.quiz.feedbackTitle.textContent = '正解！';
+                DOM.quiz.feedbackTitle.className = 'text-3xl font-black mb-4 text-teal-600';
+                
+                appState.combo++;
+                if (appState.combo > appState.maxCombo) appState.maxCombo = appState.combo;
+                appState.score += 100 + (appState.combo - 1) * 20;
+                appState.correctCount++;
+                
+                updateScoreUI();
+                showCombo();
+            } else {
+                playSound('wrong');
+                appState.combo = 0;
+                DOM.quiz.feedbackContent.classList.add('bg-white', 'border-rose-400', 'animate-shake');
+                DOM.quiz.feedbackIcon.textContent = '❌';
+                DOM.quiz.feedbackIcon.className = 'text-7xl mb-4 text-rose-500';
+                DOM.quiz.feedbackTitle.textContent = 'ざんねん...';
+                DOM.quiz.feedbackTitle.className = 'text-3xl font-black mb-4 text-rose-600';
+                
+                updateScoreUI();
+            }
+        }
+
+        function updateScoreUI() {
+            DOM.quiz.score.textContent = appState.score;
+        }
+
+        function showCombo() {
+            if (appState.combo >= 2) {
+                DOM.quiz.combo.textContent = `${appState.combo} COMBO! 🔥`;
+                DOM.quiz.combo.classList.remove('opacity-0', 'scale-50');
+                DOM.quiz.combo.classList.add('opacity-100', 'scale-110', 'animate-pop');
+                setTimeout(() => DOM.quiz.combo.classList.remove('scale-110'), 300);
+            } else {
+                DOM.quiz.combo.classList.add('opacity-0');
+            }
+        }
+
+        DOM.quiz.btnNext.onclick = () => {
+            DOM.quiz.feedbackOverlay.classList.add('hidden');
+            DOM.quiz.feedbackContent.className = '';
+            
+            appState.currentIndex++;
+            if (appState.currentIndex < appState.currentQuestions.length) {
+                renderQuestion();
+            } else {
+                finishQuiz();
+            }
+        };
+
+        function finishQuiz() {
+            playSound('finish');
+            DOM.quiz.progressBar.style.width = `100%`;
+            
+            const total = appState.currentQuestions.length;
+            const percent = Math.round((appState.correctCount / total) * 100);
+            
+            DOM.result.percent.innerHTML = `${percent}<span class="text-2xl">%</span>`;
+            DOM.result.score.textContent = appState.score;
+            DOM.result.maxCombo.textContent = appState.maxCombo;
+            
+            showScreen('result');
+        }
+
+        DOM.home.btnStart.onclick = startQuiz;
+        DOM.result.btnHome.onclick = () => showScreen('home');
+
+        // ★ステップ1でコピーしたGASのウェブアプリURLをここに貼り付けてください★
+        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxhpAbX_14rvdOiSGH4z4s6opqIucTH6NvUnm5PUEMThG7iMrtzpfFr9QcvKkEr0aL_sQ/exec"; 
+
+        window.onload = () => {
+            showScreen('loading');
+            
+            if (GAS_API_URL !== "https://script.google.com/macros/s/AKfycbxhpAbX_14rvdOiSGH4z4s6opqIucTH6NvUnm5PUEMThG7iMrtzpfFr9QcvKkEr0aL_sQ/exec") {
+                // GitHub Pages 等の外部環境からGASのAPIを叩く処理
+                fetch(GAS_API_URL)
+                    .then(response => {
+                        if (!response.ok) throw new Error("ネットワークエラー");
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.error) throw new Error(data.error);
+                        if (!data || data.length === 0) {
+                            throw new Error("スプレッドシートに問題が見つかりません。");
+                        }
+                        loadData(data);
+                        showScreen('home');
+                    })
+                    .catch(error => {
+                        const txt = document.getElementById('loading-text');
+                        txt.textContent = '通信エラー: ' + error.message;
+                        txt.classList.replace('text-slate-500', 'text-rose-500');
+                    });
+            } else {
+                // URLが設定されていない場合はプレビュー用のサンプルデータを表示
+                console.log("プレビュー環境のため、サンプルデータをロードします。");
+                setTimeout(() => {
+                    loadData(defaultQuestions);
+                    showScreen('home');
+                }, 1200);
+            }
+        };
+    </script>
+</body>
+</html>
